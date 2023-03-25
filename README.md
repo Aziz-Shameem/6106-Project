@@ -1,3 +1,8 @@
+Project By Aziz Shameem and Sameep Chattopadhyay
+Forked from https://github.com/shreyasc-13/correlated_bandits
+
+Original README ::
+
 <!-- Ctrl+Shift+M renders it -->
 # [Multi-Armed Bandits with Correlated Arms](https://arxiv.org/abs/1911.03959)
 
