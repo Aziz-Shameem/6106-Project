@@ -1,6 +1,8 @@
+from re import S
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from tensorboard import summary
 from tqdm import tqdm
 import operator
 import argparse
@@ -23,6 +25,9 @@ class algs:
         self.test_data = pd.read_pickle(f'preproc/{self.exp_name}s/test_data_usercount')
         self.true_means_test = pd.read_pickle(f'preproc/{self.exp_name}s/true_means_test')
 
+        pd.DataFrame.from_dict(self.tables)
+        pd.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\genres\table.csv')
+
         self.numArms = len(self.tables.keys())
         self.optArm = np.argmax(self.true_means_test)
 
@@ -30,6 +35,13 @@ class algs:
 
         d = self.test_data[self.test_data[f'{self.exp_name}_col'] == arm]
         reward = d['Rating'].sample(n=1, replace = True)
+        # print(f'reward : {reward}, type : {type(reward)}')
+        # print(f'before : {type(reward)}, {reward}')
+
+        temp = np.random.normal(self.true_means_test[arm], 0.5)
+        temp = 5 if temp>5 else temp
+        reward = reward*0 + int(temp)
+        # print(f'after : {type(reward)}, {reward}')
 
         return reward
 
@@ -45,6 +57,45 @@ class algs:
         sampleArm = np.random.normal(mean_, std_)
 
         return sampleArm
+
+    def epsilon_greedy(self, num_iterations, T) :
+
+        numArms = self.numArms
+        optArm = self.optArm
+        true_means_test = self.true_means_test
+        tables = self.tables
+        epsilon = 0.1 # can be changed 
+
+        B = [5.] * numArms
+
+        avg_regret = np.zeros((num_iterations, T))
+        for iteration in tqdm(range(num_iterations)) :
+            sumReward = np.zeros(numArms)
+            empReward = np.zeros(numArms)
+            numPulls = np.zeros(numArms)
+            regret = np.zeros(T)
+
+            for t in range(T) :
+                prob = np.random.random()
+                if prob < epsilon :
+                    # explore
+                    pull = np.random.choice(numArms)
+                else :
+                    # exploit
+                    pull = np.argmax(empReward)
+
+                numPulls[pull] += 1
+                reward = self.generate_sample(pull)
+                sumReward[pull] += reward
+                empReward[pull] = sumReward[pull] / float(numPulls[pull])
+
+                if t==0 :
+                    regret[t] = true_means_test[optArm] - true_means_test[pull]
+                else :
+                    regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
+            avg_regret[iteration, :] = regret
+        return avg_regret
+
 
     def UCB(self, num_iterations, T):
 
@@ -135,6 +186,78 @@ class algs:
             avg_ts_regret[iteration, :] = ts_regret
 
         return avg_ts_regret
+
+    def C_epsilon_greedy(self, num_iterations, T) :
+
+        numArms = self.numArms
+        optArm = self.optArm
+        true_means_test = self.true_means_test
+        tables = self.tables
+        epsilon = 0.1 # can be changed 
+
+        B = [5.] * numArms
+
+        avg_regret = np.zeros((num_iterations, T))
+        for iteration in tqdm(range(num_iterations)) :
+            sumReward = np.zeros(numArms)
+            empReward = np.zeros(numArms)
+            numPulls = np.zeros(numArms)
+            regret = np.zeros(T)
+
+            empPseudoReward = np.zeros((numArms, numArms)) #(i,j) empPseudoReward of arm $i$ wrt arm $j$.
+            sumPseudoReward = np.zeros((numArms, numArms))
+
+            for t in range(T) :
+
+                bool_ell = numPulls >= (float(t - 1)/numArms)
+
+                max_mu_hat = np.max(empReward[bool_ell])
+
+                if empReward[bool_ell].shape[0] == 1:
+                    secmax_mu_hat = max_mu_hat
+                else:
+                    temp = empReward[bool_ell]
+                    temp[::-1].sort()
+                    secmax_mu_hat = temp[1]
+                argmax_mu_hat = np.where(empReward == max_mu_hat)[0][0]
+
+                #Set of competitive arms - update through the run
+                min_phi = np.min(empPseudoReward[:, bool_ell], axis=1)
+
+                comp_set = set()
+                #Adding back the argmax arm
+                comp_set.add(argmax_mu_hat)
+
+                for arm in range(numArms):
+                    if arm != argmax_mu_hat and min_phi[arm] >= max_mu_hat:
+                        comp_set.add(arm)
+                    elif arm == argmax_mu_hat and min_phi[arm] >= secmax_mu_hat:
+                        comp_set.add(arm)
+
+                prob = np.random.random()
+                if prob < epsilon :
+                    # explore
+                    pull = np.random.choice(numArms)
+                else :
+                    # exploit
+                    pull = np.argmax(empReward)
+
+                numPulls[pull] += 1
+                reward = self.generate_sample(pull)
+                sumReward[pull] += reward
+                empReward[pull] = sumReward[pull] / float(numPulls[pull])
+
+                pseudoRewards = tables[pull][reward-1, :]
+                print(f'{pull} : {pseudoRewards}')
+                sumPseudoReward[:, pull] = sumPseudoReward[:, pull] + pseudoRewards
+                empPseudoReward[:, pull] = np.divide(sumPseudoReward[:, pull], float(numPulls[pull]))
+
+                if t==0 :
+                    regret[t] = true_means_test[optArm] - true_means_test[pull]
+                else :
+                    regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
+            avg_regret[iteration, :] = regret
+        return avg_regret
 
     def C_UCB(self, num_iterations, T):
 
@@ -321,20 +444,26 @@ class algs:
 
     def run(self, num_iterations=20, T=5000):
 
+        avg_eg_regret = self.epsilon_greedy(num_iterations, T)
         avg_ucb_regret = self.UCB(num_iterations, T)
         avg_ts_regret = self.TS(num_iterations, T)
+        avg_ceg_regret = self.C_epsilon_greedy(num_iterations, T)
         avg_cucb_regret = self.C_UCB(num_iterations, T)
         avg_cts_regret = self.C_TS(num_iterations, T)
 
         # mean cumulative regret
+        self.plot_av_eg = np.mean(avg_eg_regret, axis=0)
         self.plot_av_ucb = np.mean(avg_ucb_regret, axis=0)
         self.plot_av_ts = np.mean(avg_ts_regret, axis=0)
+        self.plot_av_ceg = np.mean(avg_ceg_regret, axis=0)
         self.plot_av_cucb = np.mean(avg_cucb_regret, axis=0)
         self.plot_av_cts = np.mean(avg_cts_regret, axis=0)
 
         # std dev over runs
+        self.plot_std_eg = np.sqrt(np.var(avg_eg_regret, axis=0))
         self.plot_std_ucb = np.sqrt(np.var(avg_ucb_regret, axis=0))
         self.plot_std_ts = np.sqrt(np.var(avg_ts_regret, axis=0))
+        self.plot_std_ceg = np.sqrt(np.var(avg_ceg_regret, axis=0))
         self.plot_std_cucb = np.sqrt(np.var(avg_cucb_regret, axis=0))
         self.plot_std_cts = np.sqrt(np.var(avg_cts_regret, axis=0))
 
@@ -385,8 +514,8 @@ class algs:
             self.tables = book_tables
 
     def save_data(self):
-        algorithms = ['ucb', 'ts', 'cucb', 'cts']
-        pathlib.Path(f'plot_arrays/{self.exp_name}s/').mkdir(parents=False, exist_ok=True)
+        algorithms = ['eg','ucb', 'ts', 'ceg', 'cucb', 'cts']
+        pathlib.Path(f'plot_arrays/{self.exp_name}s/').mkdir(parents=True, exist_ok=True)
         for alg in algorithms:
             np.save(f'plot_arrays/{self.exp_name}s/plot_av_{alg}_p{self.p:.2f}_pad{self.padval:.2f}',
                     getattr(self, f'plot_av_{alg}'))
@@ -396,15 +525,21 @@ class algs:
     def plot(self):
         spacing = 400
         # Means
+        plt.plot(range(0, 5000)[::spacing], self.plot_av_eg[::spacing], label='EpsilonGreedy', color='green', marker='*')
         plt.plot(range(0, 5000)[::spacing], self.plot_av_ucb[::spacing], label='UCB', color='red', marker='+')
         plt.plot(range(0, 5000)[::spacing], self.plot_av_ts[::spacing], label='TS', color='yellow', marker='o')
+        plt.plot(range(0, 5000)[::spacing], self.plot_av_ceg[::spacing], label='C_EpsilonGreedy', color='orange', marker='p')
         plt.plot(range(0, 5000)[::spacing], self.plot_av_cucb[::spacing], label='C-UCB', color='blue', marker='^')
         plt.plot(range(0, 5000)[::spacing], self.plot_av_cts[::spacing], label='C-TS', color='black', marker='x')
         # Confidence bounds
+        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_eg + self.plot_std_eg)[::spacing],
+                         (self.plot_av_eg - self.plot_std_eg)[::spacing], alpha=0.3, facecolor='g')
         plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ucb + self.plot_std_ucb)[::spacing],
                          (self.plot_av_ucb - self.plot_std_ucb)[::spacing], alpha=0.3, facecolor='r')
         plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ts + self.plot_std_ts)[::spacing],
                          (self.plot_av_ts - self.plot_std_ts)[::spacing], alpha=0.3, facecolor='y')
+        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ceg + self.plot_std_ceg)[::spacing],
+                         (self.plot_av_ceg - self.plot_std_ceg)[::spacing], alpha=0.3, facecolor='orange')
         plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cucb + self.plot_std_cucb)[::spacing],
                          (self.plot_av_cucb - self.plot_std_cucb)[::spacing], alpha=0.3, facecolor='b')
         plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cts + self.plot_std_cts)[::spacing],

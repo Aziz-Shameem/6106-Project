@@ -14,7 +14,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--movielens', dest='process_movielens', action='store_true', default=True,
                         help="Pre-process MovieLens data")
-    parser.add_argument('--goodreads', dest='process_goodreads', action='store_true', default=True,
+    parser.add_argument('--goodreads', dest='process_goodreads', action='store_true', default=False,
                         help="Pre-process Goodreads data")
     parser.add_argument('--train_test_ratio', dest='train_test_ratio', type=float, default=0.5,
                         help="Train test split ratio")
@@ -31,9 +31,9 @@ def movielens_preproc():
     movies_cols = 'MovieID::Title::Genres'.split('::')
     users_cols = 'UserID::Gender::Age::Occupation::Zip-code'.split('::')
     # Read data
-    ratings = pd.read_csv('../data/ml-1m/ratings.dat', sep='::', engine='python', names=ratings_cols)
-    movies = pd.read_csv('../data/ml-1m/movies.dat', sep='::', engine='python', names=movies_cols)
-    users = pd.read_csv('../data/ml-1m/users.dat', sep='::', engine='python', names=users_cols)
+    ratings = pd.read_csv('../data/ml-1m/ratings.dat', sep='::', engine='python', names=ratings_cols, encoding='latin-1')
+    movies = pd.read_csv('../data/ml-1m/movies.dat', sep='::', engine='python', names=movies_cols, encoding='latin-1')
+    users = pd.read_csv('../data/ml-1m/users.dat', sep='::', engine='python', names=users_cols, encoding='latin-1')
 
     # Randomly assign one genre out of multiple to each movie
     gs = movies['Genres'].tolist()
