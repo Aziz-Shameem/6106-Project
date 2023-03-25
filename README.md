@@ -1,4 +1,5 @@
 Project By Aziz Shameem and Sameep Chattopadhyay
+
 Forked from https://github.com/shreyasc-13/correlated_bandits
 
 Original README ::
