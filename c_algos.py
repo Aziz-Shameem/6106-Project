@@ -10,6 +10,8 @@ import sys
 import matplotlib.pyplot as plt
 plt.style.use('data/plots_paper.mplstyle')
 import pathlib
+import warnings
+warnings.filterwarnings("ignore")
 
 
 class algs:
@@ -21,15 +23,26 @@ class algs:
         self.padval = padval
 
         #Load data
-        self.tables = pd.read_pickle(f'preproc/{self.exp_name}s/{self.exp_name}_tables_train.pkl')
+        # self.tables = pd.read_pickle(f'preproc/{self.exp_name}s/{self.exp_name}_tables_train.pkl')
+        self.tables = pd.read_csv(f'preproc/{self.exp_name}s/{self.exp_name}_table.csv')
         self.test_data = pd.read_pickle(f'preproc/{self.exp_name}s/test_data_usercount')
         self.true_means_test = pd.read_pickle(f'preproc/{self.exp_name}s/true_means_test')
 
-        pd.DataFrame.from_dict(self.tables)
-        pd.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\genres\table.csv')
-
-        self.numArms = len(self.tables.keys())
+        self.numArms = len(self.true_means_test)
         self.optArm = np.argmax(self.true_means_test)
+
+        
+        # CODE TO FORM TABLE FROM PICKLE
+        # for i in range(self.numArms) :
+        #     temp = pd.DataFrame.from_dict(self.tables[i])
+        #     if i==0 :
+        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\table.csv')
+        #     else :
+        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\table.csv', mode='a')
+
+        # print('Values loaded in tables.csv..')
+        
+        
 
     def generate_sample(self, arm):
 
@@ -247,8 +260,8 @@ class algs:
                 sumReward[pull] += reward
                 empReward[pull] = sumReward[pull] / float(numPulls[pull])
 
-                pseudoRewards = tables[pull][reward-1, :]
-                print(f'{pull} : {pseudoRewards}')
+                # pseudoRewards = tables[pull][reward-1, :]
+                pseudoRewards = np.array(tables[tables.pull==pull][tables.reward==reward.values[0]-1]).reshape(-1)[2:]
                 sumPseudoReward[:, pull] = sumPseudoReward[:, pull] + pseudoRewards
                 empPseudoReward[:, pull] = np.divide(sumPseudoReward[:, pull], float(numPulls[pull]))
 
@@ -330,7 +343,8 @@ class algs:
                 empReward[k_t] = sumReward[k_t]/float(pulls[k_t])
 
                 #Pseudo-reward updates
-                pseudoRewards = tables[k_t][reward-1, :] #(zero-indexed)
+                # pseudoRewards = tables[k_t][reward-1, :] #(zero-indexed)
+                pseudoRewards = np.array(tables[tables.pull==k_t][tables.reward==reward.values[0]-1]).reshape(-1)[2:]
 
                 sumPseudoReward[:, k_t] = sumPseudoReward[:, k_t] + pseudoRewards
                 empPseudoReward[:, k_t] = np.divide(sumPseudoReward[:, k_t], float(pulls[k_t]))
@@ -427,7 +441,8 @@ class algs:
                 TSC_empReward[k_t] = TSC_sumReward[k_t]/float(TSC_pulls[k_t])
 
                 # Pseudo-reward updates
-                TSC_pseudoRewards = tables[k_t][reward-1, :] #(zero-indexed)
+                # TSC_pseudoRewards = tables[k_t][reward-1, :] #(zero-indexed)
+                TSC_pseudoRewards = np.array(tables[tables.pull==k_t][tables.reward==reward.values[0]-1]).reshape(-1)[2:]
 
                 TSC_sumPseudoReward[:, k_t] = TSC_sumPseudoReward[:, k_t] + TSC_pseudoRewards
                 TSC_empPseudoReward[:, k_t] = np.divide(TSC_sumPseudoReward[:, k_t], float(TSC_pulls[k_t]))
@@ -447,6 +462,7 @@ class algs:
         avg_eg_regret = self.epsilon_greedy(num_iterations, T)
         avg_ucb_regret = self.UCB(num_iterations, T)
         avg_ts_regret = self.TS(num_iterations, T)
+
         avg_ceg_regret = self.C_epsilon_greedy(num_iterations, T)
         avg_cucb_regret = self.C_UCB(num_iterations, T)
         avg_cts_regret = self.C_TS(num_iterations, T)
@@ -473,26 +489,28 @@ class algs:
 
         if self.exp_name == 'genre':
             # code only masks values as done in the paper
-            genre_tables = pd.read_pickle(f'preproc/{self.exp_name}s/genre_tables_train.pkl')
+            genre_tables = pd.read_csv(f'preproc/{self.exp_name}s/{self.exp_name}_table.csv')
             p = self.p
             for genre in range(18):
-                for row in range(genre_tables[genre].shape[0]):
-                    row_len = int(genre_tables[genre].shape[1])
-                    genre_tables[genre][row][np.random.choice(np.arange(row_len), size=int(p*row_len), replace=False)] = 5.
+                for row in range(5):
+                    row_len = 18
+                    genre_tables.loc[(genre_tables.pull==genre) & (genre_tables.reward==row), list(map(str, np.random.choice(np.arange(row_len), size=int(p*row_len), replace=False)))] = 5.
             # restore reference columns
             for genre in range(18):
-                genre_tables[genre][:, genre] = np.arange(1,6)
+                genre_tables.loc[genre_tables['pull']==genre, str(genre)] = np.arange(1,6)
 
             self.tables = genre_tables
 
         elif self.exp_name == 'movie':
             # code only pads entries as done in the paper
-            movie_tables = pd.read_pickle(f'preproc/{self.exp_name}s/movie_tables_train.pkl')
+            movie_tables = pd.read_csv(f'preproc/{self.exp_name}s/{self.exp_name}_table.csv')
             pad_val = self.padval
             for movie in range(50): # top 50 movies picked in preproc
-                movie_tables[movie] += pad_val
-                movie_tables[movie][movie_tables[movie] > 5] = 5.
-                movie_tables[movie][:,movie] = np.arange(1,6)
+                movie_tables.loc[movie_tables.pull==movie, list(map(str, np.arange(50)))] += pad_val
+            for i in range(50) :
+                movie_tables[str(i)] = movie_tables[str(i)].clip(upper=5.0)
+            for movie in range(50) :
+                movie_tables.loc[movie_tables['pull']==movie, str(movie)] = np.arange(1,6)
 
             self.tables = movie_tables
 
@@ -522,7 +540,7 @@ class algs:
             np.save(f'plot_arrays/{self.exp_name}s/plot_std_{alg}_p{self.p:.2f}_pad{self.padval:.2f}',
                     getattr(self, f'plot_std_{alg}'))
 
-    def plot(self):
+    def plot(self, num_iterations):
         spacing = 400
         # Means
         plt.plot(range(0, 5000)[::spacing], self.plot_av_eg[::spacing], label='EpsilonGreedy', color='green', marker='*')
@@ -551,7 +569,7 @@ class algs:
         plt.ylabel('Cumulative Regret')
         # Save
         pathlib.Path('data/plots/').mkdir(parents=False, exist_ok=True)
-        plt.savefig(f'data/plots/{self.exp_name}_p{self.p:.2f}_pad{self.padval:.2f}.pdf')
+        plt.savefig(f'data/plots/{self.exp_name}_p{self.p:.2f}_pad{self.padval:.2f}_iter{num_iterations}.pdf')
 
 
 def parse_arguments():
@@ -570,7 +588,7 @@ def main(args):
     bandit_obj = algs(args.exp, p=args.p, padval=args.padval)
     bandit_obj.edit_data()
     bandit_obj.run(args.num_iterations, args.T)
-    bandit_obj.plot()
+    bandit_obj.plot(args.num_iterations)
 
 
 if __name__ == '__main__':
