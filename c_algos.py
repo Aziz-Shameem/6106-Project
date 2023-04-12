@@ -15,18 +15,19 @@ warnings.filterwarnings("ignore")
 
 
 class algs:
-    def __init__(self, exp='genre', p=0.0, padval=0.0):
+    def __init__(self, exp='genre', p=0.0, padval=0.0, true_means='true_means_test'):
 
         assert(exp in ['genre', 'movie', 'book'])
         self.exp_name = exp
         self.p = p
         self.padval = padval
+        self.true_means = true_means
 
         #Load data
         # self.tables = pd.read_pickle(f'preproc/{self.exp_name}s/{self.exp_name}_tables_train.pkl')
         self.tables = pd.read_csv(f'preproc/{self.exp_name}s/{self.exp_name}_table.csv')
         self.test_data = pd.read_pickle(f'preproc/{self.exp_name}s/test_data_usercount')
-        self.true_means_test = pd.read_pickle(f'preproc/{self.exp_name}s/true_means_test')
+        self.true_means_test = pd.read_pickle(f'preproc/{self.exp_name}s/{self.true_means}')
 
         self.numArms = len(self.true_means_test)
         self.optArm = np.argmax(self.true_means_test)
@@ -582,12 +583,13 @@ def parse_arguments():
     parser.add_argument('--p', dest='p', type=float, default=0.0, help="Fraction of table entries to mask")
     parser.add_argument('--padval', dest='padval', type=float, default=0.0, help="Padding value for table entries")
     parser.add_argument('--algo', dest='algo', type=str, default='all', help="Which algo to run")
+    parser.add_argument('--true_means', dest='true_means', type=str, default='true_means_test', help="Which dataset to use")
     return parser.parse_args()
 
 
 def main(args):
     args = parse_arguments()
-    bandit_obj = algs(args.exp, p=args.p, padval=args.padval)
+    bandit_obj = algs(args.exp, p=args.p, padval=args.padval, true_means=args.true_means)
     bandit_obj.edit_data()
     bandit_obj.run(args.num_iterations, args.T, args.algo)
     bandit_obj.plot(args.num_iterations, args.algo)
