@@ -34,13 +34,13 @@ class algs:
         
         # CODE TO FORM TABLE FROM PICKLE
         # for i in range(self.numArms) :
-        #     temp = pd.DataFrame.from_dict(self.tables[i])
+        #     temp = pd.DataFrame.from_dict(self.test_data[self.test_data[f'{self.exp_name}_col'] == i])
         #     if i==0 :
-        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\table.csv')
+        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\test_table.csv')
         #     else :
-        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\table.csv', mode='a')
+        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\test_table.csv', mode='a')
 
-        # print('Values loaded in tables.csv..')
+        # print('Values loaded in test_table.csv..')
         
         
 
@@ -262,6 +262,7 @@ class algs:
 
                 # pseudoRewards = tables[pull][reward-1, :]
                 pseudoRewards = np.array(tables[tables.pull==pull][tables.reward==reward.values[0]-1]).reshape(-1)[2:]
+                print(f'pseudoRewards : {pseudoRewards}')
                 sumPseudoReward[:, pull] = sumPseudoReward[:, pull] + pseudoRewards
                 empPseudoReward[:, pull] = np.divide(sumPseudoReward[:, pull], float(numPulls[pull]))
 
@@ -457,33 +458,33 @@ class algs:
 
         return avg_tsc_regret
 
-    def run(self, num_iterations=20, T=5000):
+    def run(self, num_iterations=20, T=5000, algo='all'):
 
-        avg_eg_regret = self.epsilon_greedy(num_iterations, T)
-        avg_ucb_regret = self.UCB(num_iterations, T)
-        avg_ts_regret = self.TS(num_iterations, T)
+        if algo=='eg' or algo=='all' : avg_eg_regret = self.epsilon_greedy(num_iterations, T)
+        if algo=='ucb' or algo=='all' : avg_ucb_regret = self.UCB(num_iterations, T)
+        if algo=='ts' or algo=='all' : avg_ts_regret = self.TS(num_iterations, T)
 
-        avg_ceg_regret = self.C_epsilon_greedy(num_iterations, T)
-        avg_cucb_regret = self.C_UCB(num_iterations, T)
-        avg_cts_regret = self.C_TS(num_iterations, T)
+        if algo=='ceg' or algo=='all' : avg_ceg_regret = self.C_epsilon_greedy(num_iterations, T)
+        if algo=='cucb' or algo=='all' : avg_cucb_regret = self.C_UCB(num_iterations, T)
+        if algo=='cts' or algo=='all' : avg_cts_regret = self.C_TS(num_iterations, T)
 
         # mean cumulative regret
-        self.plot_av_eg = np.mean(avg_eg_regret, axis=0)
-        self.plot_av_ucb = np.mean(avg_ucb_regret, axis=0)
-        self.plot_av_ts = np.mean(avg_ts_regret, axis=0)
-        self.plot_av_ceg = np.mean(avg_ceg_regret, axis=0)
-        self.plot_av_cucb = np.mean(avg_cucb_regret, axis=0)
-        self.plot_av_cts = np.mean(avg_cts_regret, axis=0)
+        if algo=='eg' or algo=='all' : self.plot_av_eg = np.mean(avg_eg_regret, axis=0)
+        if algo=='ucb' or algo=='all' : self.plot_av_ucb = np.mean(avg_ucb_regret, axis=0)
+        if algo=='ts' or algo=='all' : self.plot_av_ts = np.mean(avg_ts_regret, axis=0)
+        if algo=='ceg' or algo=='all' : self.plot_av_ceg = np.mean(avg_ceg_regret, axis=0)
+        if algo=='cucb' or algo=='all' : self.plot_av_cucb = np.mean(avg_cucb_regret, axis=0)
+        if algo=='cts' or algo=='all' : self.plot_av_cts = np.mean(avg_cts_regret, axis=0)
 
         # std dev over runs
-        self.plot_std_eg = np.sqrt(np.var(avg_eg_regret, axis=0))
-        self.plot_std_ucb = np.sqrt(np.var(avg_ucb_regret, axis=0))
-        self.plot_std_ts = np.sqrt(np.var(avg_ts_regret, axis=0))
-        self.plot_std_ceg = np.sqrt(np.var(avg_ceg_regret, axis=0))
-        self.plot_std_cucb = np.sqrt(np.var(avg_cucb_regret, axis=0))
-        self.plot_std_cts = np.sqrt(np.var(avg_cts_regret, axis=0))
+        if algo=='eg' or algo=='all' : self.plot_std_eg = np.sqrt(np.var(avg_eg_regret, axis=0))
+        if algo=='ucb' or algo=='all' : self.plot_std_ucb = np.sqrt(np.var(avg_ucb_regret, axis=0))
+        if algo=='ts' or algo=='all' : self.plot_std_ts = np.sqrt(np.var(avg_ts_regret, axis=0))
+        if algo=='ceg' or algo=='all' : self.plot_std_ceg = np.sqrt(np.var(avg_ceg_regret, axis=0))
+        if algo=='cucb' or algo=='all' : self.plot_std_cucb = np.sqrt(np.var(avg_cucb_regret, axis=0))
+        if algo=='cts' or algo=='all' : self.plot_std_cts = np.sqrt(np.var(avg_cts_regret, axis=0))
 
-        self.save_data()
+        self.save_data(algo)
 
     def edit_data(self):
 
@@ -531,8 +532,8 @@ class algs:
 
             self.tables = book_tables
 
-    def save_data(self):
-        algorithms = ['eg','ucb', 'ts', 'ceg', 'cucb', 'cts']
+    def save_data(self, algo='all'):
+        algorithms = ['eg','ucb', 'ts', 'ceg', 'cucb', 'cts'] if algo=='all' else [algo]
         pathlib.Path(f'plot_arrays/{self.exp_name}s/').mkdir(parents=True, exist_ok=True)
         for alg in algorithms:
             np.save(f'plot_arrays/{self.exp_name}s/plot_av_{alg}_p{self.p:.2f}_pad{self.padval:.2f}',
@@ -540,27 +541,27 @@ class algs:
             np.save(f'plot_arrays/{self.exp_name}s/plot_std_{alg}_p{self.p:.2f}_pad{self.padval:.2f}',
                     getattr(self, f'plot_std_{alg}'))
 
-    def plot(self, num_iterations):
+    def plot(self, num_iterations, algo='all'):
         spacing = 400
         # Means
-        plt.plot(range(0, 5000)[::spacing], self.plot_av_eg[::spacing], label='EpsilonGreedy', color='green', marker='*')
-        plt.plot(range(0, 5000)[::spacing], self.plot_av_ucb[::spacing], label='UCB', color='red', marker='+')
-        plt.plot(range(0, 5000)[::spacing], self.plot_av_ts[::spacing], label='TS', color='yellow', marker='o')
-        plt.plot(range(0, 5000)[::spacing], self.plot_av_ceg[::spacing], label='C_EpsilonGreedy', color='orange', marker='p')
-        plt.plot(range(0, 5000)[::spacing], self.plot_av_cucb[::spacing], label='C-UCB', color='blue', marker='^')
-        plt.plot(range(0, 5000)[::spacing], self.plot_av_cts[::spacing], label='C-TS', color='black', marker='x')
+        if algo=='eg' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_eg[::spacing], label='EpsilonGreedy', color='green', marker='*')
+        if algo=='ucb' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_ucb[::spacing], label='UCB', color='red', marker='+')
+        if algo=='ts' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_ts[::spacing], label='TS', color='yellow', marker='o')
+        if algo=='ceg' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_ceg[::spacing], label='C_EpsilonGreedy', color='orange', marker='p')
+        if algo=='cucb' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_cucb[::spacing], label='C-UCB', color='blue', marker='^')
+        if algo=='cts' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_cts[::spacing], label='C-TS', color='black', marker='x')
         # Confidence bounds
-        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_eg + self.plot_std_eg)[::spacing],
+        if algo=='eg' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_eg + self.plot_std_eg)[::spacing],
                          (self.plot_av_eg - self.plot_std_eg)[::spacing], alpha=0.3, facecolor='g')
-        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ucb + self.plot_std_ucb)[::spacing],
+        if algo=='ucb' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ucb + self.plot_std_ucb)[::spacing],
                          (self.plot_av_ucb - self.plot_std_ucb)[::spacing], alpha=0.3, facecolor='r')
-        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ts + self.plot_std_ts)[::spacing],
+        if algo=='ts' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ts + self.plot_std_ts)[::spacing],
                          (self.plot_av_ts - self.plot_std_ts)[::spacing], alpha=0.3, facecolor='y')
-        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ceg + self.plot_std_ceg)[::spacing],
+        if algo=='ceg' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ceg + self.plot_std_ceg)[::spacing],
                          (self.plot_av_ceg - self.plot_std_ceg)[::spacing], alpha=0.3, facecolor='orange')
-        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cucb + self.plot_std_cucb)[::spacing],
+        if algo=='cucb' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cucb + self.plot_std_cucb)[::spacing],
                          (self.plot_av_cucb - self.plot_std_cucb)[::spacing], alpha=0.3, facecolor='b')
-        plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cts + self.plot_std_cts)[::spacing],
+        if algo=='cts' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cts + self.plot_std_cts)[::spacing],
                          (self.plot_av_cts - self.plot_std_cts)[::spacing], alpha=0.3, facecolor='k')
         # Plot
         plt.legend()
@@ -580,6 +581,7 @@ def parse_arguments():
     parser.add_argument('--T', dest='T', type=int, default=5000, help="Number of rounds")
     parser.add_argument('--p', dest='p', type=float, default=0.0, help="Fraction of table entries to mask")
     parser.add_argument('--padval', dest='padval', type=float, default=0.0, help="Padding value for table entries")
+    parser.add_argument('--algo', dest='algo', type=str, default='all', help="Which algo to run")
     return parser.parse_args()
 
 
@@ -587,8 +589,8 @@ def main(args):
     args = parse_arguments()
     bandit_obj = algs(args.exp, p=args.p, padval=args.padval)
     bandit_obj.edit_data()
-    bandit_obj.run(args.num_iterations, args.T)
-    bandit_obj.plot(args.num_iterations)
+    bandit_obj.run(args.num_iterations, args.T, args.algo)
+    bandit_obj.plot(args.num_iterations, args.algo)
 
 
 if __name__ == '__main__':
