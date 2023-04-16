@@ -1,3 +1,4 @@
+from audioop import avg
 from re import S
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -54,6 +55,7 @@ class algs:
 
         temp = np.random.normal(self.true_means_test[arm], 0.5)
         temp = 5 if temp>5 else temp
+        temp = 1 if temp<1 else temp
         reward = reward*0 + int(temp)
         # print(f'after : {type(reward)}, {reward}')
 
@@ -108,7 +110,49 @@ class algs:
                 else :
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_regret[iteration, :] = regret
+        print(avg_regret.shape)
         return avg_regret
+
+    def GB(self, num_iterations, T) :
+
+        def softmax(arr) :
+            temp = np.exp(arr)
+            return temp / np.sum(temp)
+        
+        numArms = self.numArms
+        optArm = self.optArm
+        true_means_test = self.true_means_test
+        tables = self.tables
+        alpha = 0.1 # can be changed
+
+        B = [5.] * numArms
+        avg_gb_regret = np.zeros((num_iterations, T))
+        for iteration in tqdm(range(num_iterations)) :
+            sumReward = np.zeros(numArms)
+            empReward = np.zeros(numArms)
+            numPulls = np.zeros(numArms)
+            regret = np.zeros(T)
+            prefs = np.ones(numArms)
+
+            for t in range(T) :
+                probs =  softmax(prefs)
+                pull = np.random.choice(np.arange(numArms), p=probs)
+                numPulls[pull] += 1
+                reward = self.generate_sample(pull)
+                sumReward[pull] += reward
+                empReward[pull] = sumReward[pull] / float(numPulls[pull])
+                totReward = np.sum(sumReward)
+                avgReward = totReward / np.sum(numPulls)
+
+                prefs = prefs - alpha*(totReward - avgReward)*probs
+                prefs[pull] +=  alpha*(totReward - avgReward)
+
+                if t==0 :
+                    regret[t] = true_means_test[optArm] - true_means_test[pull]
+                else :
+                    regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
+            avg_gb_regret[iteration, :] = regret
+        return avg_gb_regret
 
 
     def UCB(self, num_iterations, T):
@@ -263,7 +307,6 @@ class algs:
 
                 # pseudoRewards = tables[pull][reward-1, :]
                 pseudoRewards = np.array(tables[tables.pull==pull][tables.reward==reward.values[0]-1]).reshape(-1)[2:]
-                print(f'pseudoRewards : {pseudoRewards}')
                 sumPseudoReward[:, pull] = sumPseudoReward[:, pull] + pseudoRewards
                 empPseudoReward[:, pull] = np.divide(sumPseudoReward[:, pull], float(numPulls[pull]))
 
@@ -273,6 +316,91 @@ class algs:
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_regret[iteration, :] = regret
         return avg_regret
+
+    def C_GB(self, num_iterations, T) :
+
+        def softmax(arr) :
+            temp = np.exp(arr)
+            return temp / np.sum(temp)
+        
+        numArms = self.numArms
+        optArm = self.optArm
+        true_means_test = self.true_means_test
+        tables = self.tables
+        alpha = 0.1 # can be changed
+
+        B = [5.] * numArms
+        avg_gb_regret = np.zeros((num_iterations, T))
+        for iteration in tqdm(range(num_iterations)) :
+
+            sumReward = np.zeros(numArms)
+            empReward = np.zeros(numArms)
+            pulls = np.zeros(numArms)
+            numPulls = np.zeros(numArms)
+            regret = np.zeros(T)
+            prefs = np.ones(numArms)
+
+            empReward[:] = np.inf
+
+            empPseudoReward = np.zeros((numArms, numArms)) #(i,j) empPseudoReward of arm $i$ wrt arm $j$.
+            sumPseudoReward = np.zeros((numArms, numArms))
+
+            empPseudoReward[:,:] = np.inf
+
+            for t in range(T) :
+                bool_ell = pulls >= (float(t - 1)/numArms)
+                max_mu_hat = np.max(empReward[bool_ell])
+                if empReward[bool_ell].shape[0] == 1:
+                    secmax_mu_hat = max_mu_hat
+                else:
+                    temp = empReward[bool_ell]
+                    temp[::-1].sort()
+                    secmax_mu_hat = temp[1]
+                argmax_mu_hat = np.where(empReward == max_mu_hat)[0][0]
+
+                min_phi = np.min(empPseudoReward[:, bool_ell], axis=1)
+                comp_set = set()
+                comp_set.add(argmax_mu_hat)
+
+                for arm in range(numArms):
+                    if arm != argmax_mu_hat and min_phi[arm] >= max_mu_hat:
+                        comp_set.add(arm)
+                    elif arm == argmax_mu_hat and min_phi[arm] >= secmax_mu_hat:
+                        comp_set.add(arm)
+
+                probs =  softmax(prefs)
+                # pull = np.random.choice(np.arange(numArms), p=probs)
+                work_probs = np.array([probs[i] for i in list(comp_set)])
+                pull = np.random.choice(list(comp_set), p=work_probs/np.sum(work_probs)) 
+                numPulls[pull] += 1
+                pulls[pull] = pulls[pull] + 1
+                reward = self.generate_sample(pull)
+                sumReward[pull] += reward
+                empReward[pull] = sumReward[pull] / float(numPulls[pull])
+
+                pseudoRewards = np.array(tables[tables.pull==pull][tables.reward==reward.values[0]-1]).reshape(-1)[2:]
+
+                sumPseudoReward[:, pull] = sumPseudoReward[:, pull] + pseudoRewards
+                empPseudoReward[:, pull] = np.divide(sumPseudoReward[:, pull], float(pulls[pull]))
+
+                #Diagonal elements of pseudorewards
+                empPseudoReward[np.arange(numArms), np.arange(numArms)] = empReward
+
+
+                totReward = np.sum(sumReward)
+                avgReward = totReward / np.sum(numPulls)
+
+                prefs = prefs - alpha*(totReward - avgReward)*probs
+                prefs[pull] +=  alpha*(totReward - avgReward)
+
+                if t==0 :
+                    regret[t] = true_means_test[optArm] - true_means_test[pull]
+                else :
+                    regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
+            avg_gb_regret[iteration, :] = regret
+
+        return avg_gb_regret
+
 
     def C_UCB(self, num_iterations, T):
 
@@ -354,7 +482,7 @@ class algs:
                 #Diagonal elements of pseudorewards
                 empPseudoReward[np.arange(numArms), np.arange(numArms)] = empReward
 
-                #Update UCB+LCB indices: Using pseduorewards
+                #Update UCB+LCB indices:
                 for k in range(numArms):
                     if(pulls[k] > 0):
                         #UCB index
@@ -464,26 +592,33 @@ class algs:
         if algo=='eg' or algo=='all' : avg_eg_regret = self.epsilon_greedy(num_iterations, T)
         if algo=='ucb' or algo=='all' : avg_ucb_regret = self.UCB(num_iterations, T)
         if algo=='ts' or algo=='all' : avg_ts_regret = self.TS(num_iterations, T)
+        if algo=='gb' or algo=='all' : avg_gb_regret = self.GB(num_iterations, T)
 
         if algo=='ceg' or algo=='all' : avg_ceg_regret = self.C_epsilon_greedy(num_iterations, T)
         if algo=='cucb' or algo=='all' : avg_cucb_regret = self.C_UCB(num_iterations, T)
         if algo=='cts' or algo=='all' : avg_cts_regret = self.C_TS(num_iterations, T)
+        if algo=='cgb' or algo=='all' : avg_cgb_regret = self.C_GB(num_iterations, T)
+
 
         # mean cumulative regret
         if algo=='eg' or algo=='all' : self.plot_av_eg = np.mean(avg_eg_regret, axis=0)
         if algo=='ucb' or algo=='all' : self.plot_av_ucb = np.mean(avg_ucb_regret, axis=0)
         if algo=='ts' or algo=='all' : self.plot_av_ts = np.mean(avg_ts_regret, axis=0)
+        if algo=='gb' or algo=='all' : self.plot_av_gb = np.mean(avg_gb_regret, axis=0)
         if algo=='ceg' or algo=='all' : self.plot_av_ceg = np.mean(avg_ceg_regret, axis=0)
         if algo=='cucb' or algo=='all' : self.plot_av_cucb = np.mean(avg_cucb_regret, axis=0)
         if algo=='cts' or algo=='all' : self.plot_av_cts = np.mean(avg_cts_regret, axis=0)
+        if algo=='cgb' or algo=='all' : self.plot_av_cgb = np.mean(avg_cgb_regret, axis=0)
 
         # std dev over runs
         if algo=='eg' or algo=='all' : self.plot_std_eg = np.sqrt(np.var(avg_eg_regret, axis=0))
         if algo=='ucb' or algo=='all' : self.plot_std_ucb = np.sqrt(np.var(avg_ucb_regret, axis=0))
         if algo=='ts' or algo=='all' : self.plot_std_ts = np.sqrt(np.var(avg_ts_regret, axis=0))
+        if algo=='gb' or algo=='all' : self.plot_std_gb = np.sqrt(np.var(avg_gb_regret, axis=0))
         if algo=='ceg' or algo=='all' : self.plot_std_ceg = np.sqrt(np.var(avg_ceg_regret, axis=0))
         if algo=='cucb' or algo=='all' : self.plot_std_cucb = np.sqrt(np.var(avg_cucb_regret, axis=0))
         if algo=='cts' or algo=='all' : self.plot_std_cts = np.sqrt(np.var(avg_cts_regret, axis=0))
+        if algo=='cgb' or algo=='all' : self.plot_std_cgb = np.sqrt(np.var(avg_cgb_regret, axis=0))
 
         self.save_data(algo)
 
@@ -534,7 +669,7 @@ class algs:
             self.tables = book_tables
 
     def save_data(self, algo='all'):
-        algorithms = ['eg','ucb', 'ts', 'ceg', 'cucb', 'cts'] if algo=='all' else [algo]
+        algorithms = ['eg','ucb', 'ts', 'gb', 'ceg', 'cucb', 'cts', 'cgb'] if algo=='all' else [algo]
         pathlib.Path(f'plot_arrays/{self.exp_name}s/').mkdir(parents=True, exist_ok=True)
         for alg in algorithms:
             np.save(f'plot_arrays/{self.exp_name}s/plot_av_{alg}_p{self.p:.2f}_pad{self.padval:.2f}',
@@ -542,28 +677,36 @@ class algs:
             np.save(f'plot_arrays/{self.exp_name}s/plot_std_{alg}_p{self.p:.2f}_pad{self.padval:.2f}',
                     getattr(self, f'plot_std_{alg}'))
 
-    def plot(self, num_iterations, algo='all'):
+    def plot(self, num_iterations, T, algo='all'):
         spacing = 400
         # Means
-        if algo=='eg' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_eg[::spacing], label='EpsilonGreedy', color='green', marker='*')
-        if algo=='ucb' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_ucb[::spacing], label='UCB', color='red', marker='+')
-        if algo=='ts' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_ts[::spacing], label='TS', color='yellow', marker='o')
-        if algo=='ceg' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_ceg[::spacing], label='C_EpsilonGreedy', color='orange', marker='p')
-        if algo=='cucb' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_cucb[::spacing], label='C-UCB', color='blue', marker='^')
-        if algo=='cts' or algo=='all' : plt.plot(range(0, 5000)[::spacing], self.plot_av_cts[::spacing], label='C-TS', color='black', marker='x')
+        if algo=='eg' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_eg[::spacing], label='EpsilonGreedy', color='green', marker='*')
+        if algo=='ucb' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_ucb[::spacing], label='UCB', color='red', marker='+')
+        if algo=='ts' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_ts[::spacing], label='TS', color='yellow', marker='o')
+        if algo=='gb' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_gb[::spacing], label='GB', color='magenta', marker='1')
+        if algo=='ceg' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_ceg[::spacing], label='C-EpsilonGreedy', color='orange', marker='p')
+        if algo=='cucb' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_cucb[::spacing], label='C-UCB', color='blue', marker='^')
+        if algo=='cts' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_cts[::spacing], label='C-TS', color='black', marker='x')
+        if algo=='cgb' or algo=='all' : plt.plot(range(0, T)[::spacing], self.plot_av_cgb[::spacing], label='C-GB', color='cyan', marker='2')
+
         # Confidence bounds
-        if algo=='eg' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_eg + self.plot_std_eg)[::spacing],
+        if algo=='eg' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_eg + self.plot_std_eg)[::spacing],
                          (self.plot_av_eg - self.plot_std_eg)[::spacing], alpha=0.3, facecolor='g')
-        if algo=='ucb' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ucb + self.plot_std_ucb)[::spacing],
+        if algo=='ucb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_ucb + self.plot_std_ucb)[::spacing],
                          (self.plot_av_ucb - self.plot_std_ucb)[::spacing], alpha=0.3, facecolor='r')
-        if algo=='ts' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ts + self.plot_std_ts)[::spacing],
+        if algo=='ts' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_ts + self.plot_std_ts)[::spacing],
                          (self.plot_av_ts - self.plot_std_ts)[::spacing], alpha=0.3, facecolor='y')
-        if algo=='ceg' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_ceg + self.plot_std_ceg)[::spacing],
+        if algo=='gb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_gb + self.plot_std_gb)[::spacing],
+                         (self.plot_av_gb - self.plot_std_gb)[::spacing], alpha=0.3, facecolor='magenta')
+        if algo=='ceg' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_ceg + self.plot_std_ceg)[::spacing],
                          (self.plot_av_ceg - self.plot_std_ceg)[::spacing], alpha=0.3, facecolor='orange')
-        if algo=='cucb' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cucb + self.plot_std_cucb)[::spacing],
+        if algo=='cucb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_cucb + self.plot_std_cucb)[::spacing],
                          (self.plot_av_cucb - self.plot_std_cucb)[::spacing], alpha=0.3, facecolor='b')
-        if algo=='cts' or algo=='all' : plt.fill_between(range(0, 5000)[::spacing], (self.plot_av_cts + self.plot_std_cts)[::spacing],
+        if algo=='cts' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_cts + self.plot_std_cts)[::spacing],
                          (self.plot_av_cts - self.plot_std_cts)[::spacing], alpha=0.3, facecolor='k')
+        if algo=='cgb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_cgb + self.plot_std_cgb)[::spacing],
+                         (self.plot_av_cgb - self.plot_std_cgb)[::spacing], alpha=0.3, facecolor='cyan')
+        
         # Plot
         plt.legend()
         plt.grid(True, axis='y')
@@ -592,7 +735,7 @@ def main(args):
     bandit_obj = algs(args.exp, p=args.p, padval=args.padval, true_means=args.true_means)
     bandit_obj.edit_data()
     bandit_obj.run(args.num_iterations, args.T, args.algo)
-    bandit_obj.plot(args.num_iterations, args.algo)
+    bandit_obj.plot(args.num_iterations, args.T, args.algo)
 
 
 if __name__ == '__main__':
