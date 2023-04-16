@@ -110,7 +110,7 @@ class algs:
                 else :
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_regret[iteration, :] = regret
-        print(avg_regret.shape)
+
         return avg_regret
 
     def GB(self, num_iterations, T) :
@@ -691,21 +691,21 @@ class algs:
 
         # Confidence bounds
         if algo=='eg' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_eg + self.plot_std_eg)[::spacing],
-                         (self.plot_av_eg - self.plot_std_eg)[::spacing], alpha=0.3, facecolor='g')
+                         (self.plot_av_eg - self.plot_std_eg)[::spacing], alpha=0.2, facecolor='g')
         if algo=='ucb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_ucb + self.plot_std_ucb)[::spacing],
-                         (self.plot_av_ucb - self.plot_std_ucb)[::spacing], alpha=0.3, facecolor='r')
+                         (self.plot_av_ucb - self.plot_std_ucb)[::spacing], alpha=0.2, facecolor='r')
         if algo=='ts' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_ts + self.plot_std_ts)[::spacing],
-                         (self.plot_av_ts - self.plot_std_ts)[::spacing], alpha=0.3, facecolor='y')
+                         (self.plot_av_ts - self.plot_std_ts)[::spacing], alpha=0.2, facecolor='y')
         if algo=='gb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_gb + self.plot_std_gb)[::spacing],
-                         (self.plot_av_gb - self.plot_std_gb)[::spacing], alpha=0.3, facecolor='magenta')
+                         (self.plot_av_gb - self.plot_std_gb)[::spacing], alpha=0.2, facecolor='magenta')
         if algo=='ceg' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_ceg + self.plot_std_ceg)[::spacing],
-                         (self.plot_av_ceg - self.plot_std_ceg)[::spacing], alpha=0.3, facecolor='orange')
+                         (self.plot_av_ceg - self.plot_std_ceg)[::spacing], alpha=0.2, facecolor='orange')
         if algo=='cucb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_cucb + self.plot_std_cucb)[::spacing],
-                         (self.plot_av_cucb - self.plot_std_cucb)[::spacing], alpha=0.3, facecolor='b')
+                         (self.plot_av_cucb - self.plot_std_cucb)[::spacing], alpha=0.2, facecolor='b')
         if algo=='cts' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_cts + self.plot_std_cts)[::spacing],
-                         (self.plot_av_cts - self.plot_std_cts)[::spacing], alpha=0.3, facecolor='k')
+                         (self.plot_av_cts - self.plot_std_cts)[::spacing], alpha=0.2, facecolor='k')
         if algo=='cgb' or algo=='all' : plt.fill_between(range(0, T)[::spacing], (self.plot_av_cgb + self.plot_std_cgb)[::spacing],
-                         (self.plot_av_cgb - self.plot_std_cgb)[::spacing], alpha=0.3, facecolor='cyan')
+                         (self.plot_av_cgb - self.plot_std_cgb)[::spacing], alpha=0.2, facecolor='cyan')
         
         # Plot
         plt.legend()
