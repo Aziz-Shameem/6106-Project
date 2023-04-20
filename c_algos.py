@@ -1,5 +1,6 @@
 from audioop import avg
 from re import S
+from turtle import pu
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,13 +17,14 @@ warnings.filterwarnings("ignore")
 
 
 class algs:
-    def __init__(self, exp='genre', p=0.0, padval=0.0, true_means='true_means_test'):
+    def __init__(self, exp='genre', p=0.0, padval=0.0, true_means='true_means_test', rand='False'):
 
         assert(exp in ['genre', 'movie', 'book'])
         self.exp_name = exp
         self.p = p
         self.padval = padval
         self.true_means = true_means
+        self.rand = rand
 
         #Load data
         # self.tables = pd.read_pickle(f'preproc/{self.exp_name}s/{self.exp_name}_tables_train.pkl')
@@ -32,21 +34,27 @@ class algs:
 
         self.numArms = len(self.true_means_test)
         self.optArm = np.argmax(self.true_means_test)
+        self.numPulls = np.zeros(self.numArms)
 
+        self.data = pd.read_pickle(f'preproc/{self.exp_name}s/data_with_id')
         
         # CODE TO FORM TABLE FROM PICKLE
         # for i in range(self.numArms) :
-        #     temp = pd.DataFrame.from_dict(self.test_data[self.test_data[f'{self.exp_name}_col'] == i])
+        #     temp = pd.DataFrame.from_dict(self.data[self.data[f'{self.exp_name}_col'] == i])
         #     if i==0 :
-        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\test_table.csv')
+        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\genres\data_with_id.csv')
         #     else :
-        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\movies\test_table.csv', mode='a')
+        #         temp.to_csv(r'C:\Users\Aziz_Shameem\OneDrive\Documents\EE6106\Project\githubRepo\correlated_bandits\preproc\genres\data_with_id.csv', mode='a')
 
-        # print('Values loaded in test_table.csv..')
+        # print('Values loaded in data_with_id.csv...')
         
         
 
-    def generate_sample(self, arm):
+    def generate_samples_random(self, arm) :
+        true_means = self.true_means_test
+        sample = np.random.normal(true_means[arm], 1)
+        return max(0, min(sample, 5))
+    def generate_sample_from_data(self, arm):
 
         d = self.test_data[self.test_data[f'{self.exp_name}_col'] == arm]
         reward = d['Rating'].sample(n=1, replace = True)
@@ -60,6 +68,12 @@ class algs:
         # print(f'after : {type(reward)}, {reward}')
 
         return reward
+    
+    def generate_sample(self, arm) :
+        if self.rand :
+            return self.generate_samples_random(arm)
+        else :
+            return self.generate_sample_from_data(arm)
 
     def ThompsonSample(self, empiricalMean, numPulls, beta):
         numArms = self.numArms
@@ -111,6 +125,7 @@ class algs:
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_regret[iteration, :] = regret
 
+        print(f'Num Pulls : EG  : {numPulls}')
         return avg_regret
 
     def GB(self, num_iterations, T) :
@@ -152,6 +167,7 @@ class algs:
                 else :
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_gb_regret[iteration, :] = regret
+        print(f'Num Pulls : GB  : {numPulls}')
         return avg_gb_regret
 
 
@@ -199,6 +215,7 @@ class algs:
 
             avg_ucb_regret[iteration, :] = ucb_regret
 
+        print(f'Num Pulls : UCB : {UCB_pulls}')
         return avg_ucb_regret
 
     def TS(self, num_iterations, T):
@@ -243,6 +260,7 @@ class algs:
 
             avg_ts_regret[iteration, :] = ts_regret
 
+        print(f'Num Pulls : TS  : {numPulls}')
         return avg_ts_regret
 
     def C_epsilon_greedy(self, num_iterations, T) :
@@ -295,7 +313,10 @@ class algs:
                 prob = np.random.random()
                 if prob < epsilon :
                     # explore
-                    pull = np.random.choice(numArms)
+                    if len(comp_set) == 0 :
+                        pull -= np.random.choice(numArms)
+                    else :
+                        pull = np.random.choice(list(comp_set))
                 else :
                     # exploit
                     pull = np.argmax(empReward)
@@ -315,6 +336,7 @@ class algs:
                 else :
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_regret[iteration, :] = regret
+        print(f'Num Pulls : CEG : {numPulls}')
         return avg_regret
 
     def C_GB(self, num_iterations, T) :
@@ -369,9 +391,14 @@ class algs:
                         comp_set.add(arm)
 
                 probs =  softmax(prefs)
+                if np.isnan(probs).any() :
+                    print(f'probs : {probs}, prefs : {prefs}')
                 # pull = np.random.choice(np.arange(numArms), p=probs)
                 work_probs = np.array([probs[i] for i in list(comp_set)])
-                pull = np.random.choice(list(comp_set), p=work_probs/np.sum(work_probs)) 
+                if len(comp_set) == 0 :
+                    pull = np.random.choice(np.arange(numArms), p=probs)
+                else :
+                    pull = np.random.choice(list(comp_set), p=work_probs/np.sum(work_probs)) 
                 numPulls[pull] += 1
                 pulls[pull] = pulls[pull] + 1
                 reward = self.generate_sample(pull)
@@ -399,6 +426,7 @@ class algs:
                     regret[t] = regret[t-1] + true_means_test[optArm] - true_means_test[pull]
             avg_gb_regret[iteration, :] = regret
 
+        print(f'Num Pulls : CGB : {numPulls}')
         return avg_gb_regret
 
 
@@ -496,6 +524,7 @@ class algs:
 
             avg_cucb_regret[iteration, :] = cucb_regret
 
+        print(f'Num Pulls : CUCB: {pulls}')
         return avg_cucb_regret
 
     def C_TS(self, num_iterations, T):
@@ -585,6 +614,7 @@ class algs:
 
             avg_tsc_regret[iteration, :] = tsc_regret
 
+        print(f'Num Pulls : CTS  : {TSC_pulls}')
         return avg_tsc_regret
 
     def run(self, num_iterations=20, T=5000, algo='all'):
@@ -727,12 +757,13 @@ def parse_arguments():
     parser.add_argument('--padval', dest='padval', type=float, default=0.0, help="Padding value for table entries")
     parser.add_argument('--algo', dest='algo', type=str, default='all', help="Which algo to run")
     parser.add_argument('--true_means', dest='true_means', type=str, default='true_means_test', help="Which dataset to use")
+    parser.add_argument('--random', dest='rand', type=bool, default=False, help='Whether to sample randomly, based on true means')
     return parser.parse_args()
 
 
 def main(args):
     args = parse_arguments()
-    bandit_obj = algs(args.exp, p=args.p, padval=args.padval, true_means=args.true_means)
+    bandit_obj = algs(args.exp, p=args.p, padval=args.padval, true_means=args.true_means, rand=args.rand)
     bandit_obj.edit_data()
     bandit_obj.run(args.num_iterations, args.T, args.algo)
     bandit_obj.plot(args.num_iterations, args.T, args.algo)
