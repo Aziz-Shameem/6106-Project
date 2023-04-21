@@ -132,7 +132,7 @@ class algs:
 
         def softmax(arr) :
             temp = np.exp(arr)
-            return temp / np.sum(temp)
+            return (temp / np.sum(temp))
         
         numArms = self.numArms
         optArm = self.optArm
@@ -159,8 +159,8 @@ class algs:
                 totReward = np.sum(sumReward)
                 avgReward = totReward / np.sum(numPulls)
 
-                prefs = prefs - alpha*(totReward - avgReward)*probs
-                prefs[pull] +=  alpha*(totReward - avgReward)
+                prefs = prefs - alpha*(float(reward) - avgReward)*probs
+                prefs[pull] +=  alpha*(float(reward) - avgReward)
 
                 if t==0 :
                     regret[t] = true_means_test[optArm] - true_means_test[pull]
@@ -169,6 +169,8 @@ class algs:
             avg_gb_regret[iteration, :] = regret
         print(f'Num Pulls : GB  : {numPulls}')
         return avg_gb_regret
+
+    
 
 
     def UCB(self, num_iterations, T):
@@ -392,13 +394,16 @@ class algs:
 
                 probs =  softmax(prefs)
                 if np.isnan(probs).any() :
-                    print(f'probs : {probs}, prefs : {prefs}')
+                    print(f'probs : {probs}, prefs : {prefs}') # used for debugging
                 # pull = np.random.choice(np.arange(numArms), p=probs)
                 work_probs = np.array([probs[i] for i in list(comp_set)])
-                if len(comp_set) == 0 :
-                    pull = np.random.choice(np.arange(numArms), p=probs)
+                if t < numArms :
+                    pull = t
                 else :
-                    pull = np.random.choice(list(comp_set), p=work_probs/np.sum(work_probs)) 
+                    if len(comp_set) == 0 :
+                        pull = np.random.choice(np.arange(numArms), p=probs)
+                    else :
+                        pull = np.random.choice(list(comp_set), p=work_probs/np.sum(work_probs)) 
                 numPulls[pull] += 1
                 pulls[pull] = pulls[pull] + 1
                 reward = self.generate_sample(pull)
@@ -417,8 +422,8 @@ class algs:
                 totReward = np.sum(sumReward)
                 avgReward = totReward / np.sum(numPulls)
 
-                prefs = prefs - alpha*(totReward - avgReward)*probs
-                prefs[pull] +=  alpha*(totReward - avgReward)
+                prefs = prefs - alpha*(float(reward) - avgReward)*probs
+                prefs[pull] +=  alpha*(float(reward) - avgReward)
 
                 if t==0 :
                     regret[t] = true_means_test[optArm] - true_means_test[pull]
