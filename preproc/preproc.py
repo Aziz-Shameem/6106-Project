@@ -32,8 +32,8 @@ def movielens_preproc():
     users_cols = 'UserID::Gender::Age::Occupation::Zip-code'.split('::')
     # Read data
     ratings = pd.read_csv('../data/ml-1m/ratings.dat', sep='::', engine='python', names=ratings_cols, encoding='latin-1')
-    movies = pd.read_csv('../data/ml-1m/movies.dat', sep='::', engine='python', names=movies_cols, encoding='latin-1')
-    users = pd.read_csv('../data/ml-1m/users.dat', sep='::', engine='python', names=users_cols, encoding='latin-1')
+    movies = pd.read_csv('../data/ml-1m/movies.dat', sep='::', engine='python', names=movies_cols,encoding='latin-1')
+    users = pd.read_csv('../data/ml-1m/users.dat', sep='::', engine='python', names=users_cols,encoding='latin-1')
 
     # Randomly assign one genre out of multiple to each movie
     gs = movies['Genres'].tolist()
